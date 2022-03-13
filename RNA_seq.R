@@ -3,7 +3,7 @@
 #  - Get Differential features of RNA-Seq #
 #  - Main function to be called           #
 #  - 2019-16-08                           #
-#  - Copyright: Mohamed Hamed             #
+#  - Copyright: Mohamed Hamed / Manar Rashad    #
 ###########################################
 
 #R programming environments:
