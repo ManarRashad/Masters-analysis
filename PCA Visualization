@@ -1,0 +1,134 @@
+#################################################
+## generic script for PCA for unaggregated data##
+## Made by: Manar August.2019 ####
+
+#required packages
+Sys.setenv(R_REMOTES_NO_ERRORS_FROM_WARNINGS="true") #should be added before install ggbiplot
+library(remotes)
+remotes::install_github("vqv/ggbiplot")
+install.packages("digest")
+library(digest)
+library(readr)
+library(devtools)
+library(ggplot2)
+library(ggbiplot)
+library(tidyverse)
+
+# after processing the first lines in previous hard code the resulted phenotable
+#appear in pheno.RDATA in Hamed's file
+#load pheno tables
+load("D:/Masters material/thesis/Hamed_work_generic_code for nonaggregation/work/final_one29-8/work_byHAmed/pheno.RDATA")
+
+############## Specify the pheno you want to work on:##############
+############## choose one of the following two lines:##############
+
+#To compare between the cntrl and prediabetic along all healthy visits  
+pheno=pheno.healthy.all
+# To compare between the IR and IS in the prediabetic only along all healthy visits  
+pheno=pheno.healthy.pre
+
+############### Specify the contrast /column in the pheno table which has the two groups of comparisons
+############### Choose one of the follwoing two lines ############### 
+contrast=c("Class")
+contrast=c("IRIS")
+
+file_directory="D:/Masters material/thesis/Hamed_work_generic_code for nonaggregation/work/final_one29-8/Processed_Files"
+datasets=c("RNAseq_abundance","cytokine_abundance","gut_16s_abundance","nares_16s_abundance",
+           "proteome_abundance","metabolome_abundance")
+#dataset="metabolome_abundance"
+
+pca = list()
+dfs_processed = list()
+for (dataset in datasets)
+{
+  filepath=file.path(file_directory,dataset,paste(dataset,".txt",sep=""))
+  df<- read_delim(filepath,"\t", escape_double = FALSE, trim_ws = TRUE)
+  if(dataset %in% c("proteome_abundance","metabolome_abundance"))
+  {
+    df=df[- c((dim(df)[2] -5) : dim(df)[2])]
+  }
+  
+  #merge between abundance and phenotable
+  df_processed = df[df$SampleID %in% pheno$SampleID,]
+  df_processed = merge(df_processed, pheno, by = "SampleID", all.x = TRUE)
+  df_processed = df_processed[,c(1,((dim(df_processed)[[2]]-3):dim(df_processed)[[2]]),2:(dim(df_processed)[[2]]-4))]
+  dfs_processed[[strsplit(dataset,"_")[[1]][1]]] <- df_processed
+  #PCA_processing 
+  # choose column IRIS or Class in the following 2 lines
+  table(df_processed$Class)
+  df_processed.contrast <- as.factor(df_processed$Class)
+  #determine the class of contrast to ensure that they are factor
+  class(df_processed.contrast)
+  df_processed.abundance = df_processed[,which(colnames(df_processed) == colnames(df[2])):
+                                          ncol(df_processed)]
+  df_processed.pca <- prcomp(df_processed.abundance,scale = FALSE) # scale not suitable for normalized data, therefore center not suitable too
+  str(df_processed.pca)
+  print(df_processed.pca)
+  plot(df_processed.pca, type = "l") #l is the type of line in plot
+  pdf(file = paste(as.character(strsplit(dataset,"_")[[1]][1]),contrast,
+                   "_pca.pdf"), width = 10, height = 10)
+  summary(df_processed.pca)
+  
+  #PCA for contrast
+  df_processed_contrast<- ggbiplot(df_processed.pca, obs.scale = 1, var.scale = 1, var.axes=FALSE,groups = df_processed.contrast, ellipse = TRUE, circle = TRUE)
+  
+  df_processed_contrast <- df_processed_contrast + scale_color_discrete(name = '')
+  df_processed_contrast <- df_processed_contrast + theme(legend.direction = 'horizontal', 
+                                                         legend.position = 'top')
+  
+  print(df_processed_contrast)
+  pdf(file = paste(as.character(strsplit(dataset,"_")[[1]][1]),contrast,
+                   "_cluster.pdf"), width = 10, height = 10)
+  pca[[strsplit(dataset,"_")[[1]][1]]] <- df_processed.pca
+}
+
+save(pca,file = "pca.RDATA")
+save(dfs_processed, file = "dfs_processed.RDATA")
+load("pca.RDATA")
+load("dfs_processed.RDATA")
+
+for (i in 5:length(pca)){
+  #get the genes participate highly in PCA
+  highly_participated_genes = apply(abs(pca[[i]]$rotation),1,max) #1 indicates to genes
+  #sorting them descending
+  highly_participated_genes=  highly_participated_genes[order(-highly_participated_genes)]
+  #list the names of genes
+  highly_participated_genes= as.data.frame(highly_participated_genes)
+  #write.table(rownames(highly_participated_genes), file = paste(names(dfs_processed)[i],contrast,"highly_participated_genes.txt"),
+              #quote = FALSE, row.names = FALSE, 
+              #col.names = FALSE, sep = "\t")
+  
+  #get top 10% of genes
+  specified_participated_genes= head(highly_participated_genes,abs(((1/100)*nrow(highly_participated_genes))))
+  ###
+  specified_participated_genes = unlist(rownames(specified_participated_genes))
+  specified_df_processed = dfs_processed[[i]][,colnames(dfs_processed[[i]]) %in% specified_participated_genes]
+  specified_df_processed = cbind(dfs_processed[[i]][1:5],specified_df_processed)
+  write.csv(specified_df_processed, file = paste(names(dfs_processed)[i],
+                                                 contrast,"abundance_top_1.csv"),
+                                                 quote = FALSE, row.names = FALSE) #top 10 or 5or 1
+  
+  #PCA for top 10, change between Class&IRIS in the following lines
+  table(specified_df_processed$Class)
+  specified_df_processed.contrast <- as.factor(specified_df_processed$Class)
+  #determine the class of both to ensure that they are factor
+  class(specified_df_processed.contrast)
+  specified_df_processed.abundance =  specified_df_processed[,6:ncol(specified_df_processed)]
+  specified_df_processed.pca <- prcomp(specified_df_processed.abundance,scale = FALSE)
+  str(specified_df_processed.pca)
+  print(specified_df_processed.pca)
+  plot(specified_df_processed.pca, type = "l") #l is the type of line in plot
+  pdf(file = paste(names(dfs_processed[i]),contrast,
+                   "_pca_top1.pdf"), width = 10, height = 10)
+  summary(specified_df_processed.pca)
+  
+  specified_df_processed_contrast <- ggbiplot(specified_df_processed.pca, obs.scale = 1, var.scale = 1, var.axes=FALSE,groups = specified_df_processed.contrast, ellipse = TRUE, circle = TRUE)
+  
+  specified_df_processed_contrast <- specified_df_processed_contrast + scale_color_discrete(name = '')
+  specified_df_processed_contrast <- specified_df_processed_contrast + theme(legend.direction = 'horizontal', 
+                                                                             legend.position = 'top')
+  
+  print(specified_df_processed_contrast)
+  pdf(file = paste(names(dfs_processed[i]),contrast,
+                   "_cluster_top1.pdf"), width = 10, height = 10)
+}
