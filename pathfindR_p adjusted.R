@@ -1,5 +1,5 @@
 ###########################################
-## pathfindR using p adjusted for RNA,PROTEOMICS,CYTOKINES##
+## Functional enrichment analysis for host omics(RNA,PROTEOMICS,CYTOKINES) using pathfindR ##
 ## 25.7.2020, DONE BY MANAR        ##
 
 #Required packages
@@ -46,9 +46,3 @@ pathways_cytokine <- run_pathfindR(input_pathfindR$cytokine_Class_hits.res.txt,
 write.table(cytokines_pathways, file = "cytokines_pathways.txt", sep = "\t",
             col.names = T, quote = F, row.names = F)
 
-RNA_clustered <- cluster_enriched_terms(pathways_RNA, plot_dend = T, plot_clusters_graph = T)
-enrichment_chart(RNA_clustered, plot_by_cluster = TRUE, num_bubbles = 3)
-term_gene_heatmap(result_df = pathways_RNA, genes_df = input_pathfindR$DESeq_class_hits_res.txt)
-term_gene_graph(result_df = pathways_RNA, use_description = TRUE, node_size = "num_genes")
-UpSet_plot(result_df = pathways_RNA, genes_df = input_pathfindR$DESeq_class_hits_res.txt)# color acc to FC value
-UpSet_plot(result_df = pathways_RNA)
